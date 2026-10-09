@@ -45,7 +45,7 @@ export default function MiniMap({ size = 'md' }) {
         <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">
           <MapIcon className="h-3.5 w-3.5" /> Plant Map
         </span>
-        <span className="text-[10px] text-slate-500">110 × 44 m · 38 looms</span>
+        <span className="text-[10px] text-slate-500">110×44 m</span>
       </div>
       <svg viewBox="-58 -25 116 50" width={w} height={(w * 50) / 116} className="block">
         <defs>

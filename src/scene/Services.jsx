@@ -2,11 +2,11 @@
 // headers, emergency exits, fire equipment and signage.
 import { useLayoutEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
-import { Sparkles } from '@react-three/drei'
+import { useFrame } from '@react-three/fiber'
 import { BUILDING, LOOM_ROWS, LOOM_COLUMNS } from '../data/layout'
 import { MAT, colorMaterial } from './materials'
 import { GEO } from './geometries'
-import { beamTexture } from './textures'
+import { beamTexture, glowTexture } from './textures'
 import { Box, Cyl } from '../components/primitives'
 import { HVLSFan, ExhaustFan, FireExtinguisher, FireBucketStand, ExitSign, SafetySign } from '../components/Props'
 import { useFactoryStore } from '../hooks/useFactoryStore'
@@ -55,7 +55,7 @@ function HighBayLights() {
 
 /** Overhead cable tray + water header above each loom row. */
 function OverheadServices() {
-  const openView = useFactoryStore((st) => st.openView)
+  const openView = useFactoryStore((st) => st.openView && !st.cameraInside)
   const x0 = LOOM_COLUMNS[0] - 2.5
   const x1 = LOOM_COLUMNS[LOOM_COLUMNS.length - 1] + 2.5
   const len = x1 - x0
@@ -74,9 +74,11 @@ function OverheadServices() {
           {/* water supply header */}
           <mesh geometry={GEO.cylLow} material={MAT.bluePvc} position={[cx, 4.7, z - 1.35]} rotation={[0, 0, Math.PI / 2]} scale={[0.14, len, 0.14]} />
           {/* hangers */}
-          {!openView && Array.from({ length: Math.floor(len / 4) + 1 }, (_, i) => (
-            <Box key={i} size={[0.02, 4.5, 0.02]} position={[x0 + i * 4, 6.45, z - 1.1]} material={MAT.darkSteel} />
-          ))}
+          <group visible={!openView} userData={{ prewarm: true }}>
+            {Array.from({ length: Math.floor(len / 4) + 1 }, (_, i) => (
+              <Box key={i} size={[0.02, 4.5, 0.02]} position={[x0 + i * 4, 6.45, z - 1.1]} material={MAT.darkSteel} />
+            ))}
+          </group>
           {/* drops from header to each loom */}
           {LOOM_COLUMNS.map((x) => (
             <mesh key={x} geometry={GEO.cylLow} material={MAT.bluePvc} position={[x - 2.05, 2.85, z - 1.35]} scale={[0.05, 3.7, 0.05]} />
@@ -123,6 +125,39 @@ function ExitDoor({ position, rotation, width = 1.6 }) {
   )
 }
 
+/** Lint / dust drifting in the light (simple CPU-animated points — robust with post-processing). */
+function DustMotes({ count, scale, position, seed = 1 }) {
+  const ref = useRef()
+  const { geo, base, mat } = useMemo(() => {
+    let s0 = seed * 9301
+    const rnd = () => ((s0 = (s0 * 16807) % 2147483647) / 2147483647)
+    const base = new Float32Array(count * 3)
+    for (let i = 0; i < count; i++) {
+      base[i * 3] = (rnd() - 0.5) * scale[0]
+      base[i * 3 + 1] = (rnd() - 0.5) * scale[1]
+      base[i * 3 + 2] = (rnd() - 0.5) * scale[2]
+    }
+    const geo = new THREE.BufferGeometry()
+    geo.setAttribute('position', new THREE.BufferAttribute(base.slice(), 3))
+    const mat = new THREE.PointsMaterial({
+      size: 0.05, map: glowTexture(), color: '#fff6e0', transparent: true, opacity: 0.5, depthWrite: false, sizeAttenuation: true,
+    })
+    return { geo, base, mat }
+  }, [count, scale, seed])
+  useFrame((st) => {
+    const t = st.clock.elapsedTime
+    const pos = geo.attributes.position.array
+    for (let i = 0; i < count; i++) {
+      const k = i * 0.37
+      pos[i * 3] = base[i * 3] + Math.sin(t * 0.11 + k) * 0.6
+      pos[i * 3 + 1] = ((base[i * 3 + 1] + t * 0.05 + scale[1] / 2) % scale[1]) - scale[1] / 2
+      pos[i * 3 + 2] = base[i * 3 + 2] + Math.cos(t * 0.09 + k * 1.3) * 0.6
+    }
+    geo.attributes.position.needsUpdate = true
+  })
+  return <points ref={ref} geometry={geo} material={mat} position={position} frustumCulled={false} />
+}
+
 function LightShafts() {
   const quality = useFactoryStore((s) => s.quality)
   const mat = useMemo(
@@ -141,20 +176,20 @@ function LightShafts() {
           <mesh geometry={GEO.plane} material={mat} rotation={[0, Math.PI / 2, 0]} scale={[8, 9.2, 1]} />
         </group>
       ))}
-      <Sparkles count={200} scale={[56, 6, 32]} position={[-6, 3.5, -3]} size={1.6} speed={0.15} opacity={0.35} color="#fff8e6" noise={0.6} />
-      <Sparkles count={70} scale={[18, 6, 30]} position={[-45, 3.5, -4]} size={1.4} speed={0.12} opacity={0.3} color="#fff8e6" />
-      <Sparkles count={70} scale={[28, 6, 26]} position={[40, 3.5, -8]} size={1.4} speed={0.12} opacity={0.3} color="#fff8e6" />
+      <DustMotes count={260} scale={[56, 6, 32]} position={[-6, 3.5, -3]} seed={1} />
+      <DustMotes count={80} scale={[18, 6, 30]} position={[-45, 3.5, -4]} seed={2} />
+      <DustMotes count={80} scale={[28, 6, 26]} position={[40, 3.5, -8]} seed={3} />
     </group>
   )
 }
 
 export default function Services() {
-  const openView = useFactoryStore((st) => st.openView)
+  const openView = useFactoryStore((st) => st.openView && !st.cameraInside)
   const zb = BUILDING.minZ + 0.15
   const zf = BUILDING.maxZ - 0.15
   return (
     <group>
-      {!openView && (
+      <group visible={!openView} userData={{ prewarm: true }}>
         <>
           <HighBayLights />
           <HVLSFan position={[-20, 6.6, -11.5]} />
@@ -163,7 +198,7 @@ export default function Services() {
           <HVLSFan position={[-3, 6.6, 6.5]} speed={0.85} />
           <LightShafts />
         </>
-      )}
+      </group>
       <OverheadServices />
       {[-45, -30, -15, 15, 30, 45].map((x) => (
         <ExhaustFan key={x} position={[x, 7.2, zb]} rotation={0} />

@@ -1,6 +1,7 @@
-// Places every worker from the EMS roster in the scene.
+// Places staff in the scene: loom operators come from the saved roster +
+// today's attendance (each tends a block of looms), other staff from the EMS list.
 import { useMemo } from 'react'
-import { loomPlacements } from '../data/layout'
+import { loomPlacements, LOOM_ROWS } from '../data/layout'
 import { useFactoryStore } from '../hooks/useFactoryStore'
 import { Worker } from '../components/Worker'
 import { Interactive } from '../components/Interactive'
@@ -25,6 +26,61 @@ function postFor(worker, machinesById) {
   return POSTS[worker.station] || { position: [0, 0, 0], rotation: 0 }
 }
 
+const AISLE_L = -35.6
+const AISLE_R = 22.6
+const loomById = Object.fromEntries(loomPlacements.map((p) => [p.id, p]))
+const front = (id) => {
+  const p = loomById[id]
+  return [p.position[0] + 0.2, p.position[2] + 1.6]
+}
+
+/** Walking route through an operator's looms (via side aisles between rows). */
+function operatorRoute(ids) {
+  const pts = []
+  const stopIdx = []
+  ids.forEach((id, i) => {
+    const f = front(id)
+    if (i > 0) {
+      const prev = loomById[ids[i - 1]]
+      const cur = loomById[id]
+      if (prev.row !== cur.row) {
+        const pf = front(ids[i - 1])
+        const side = (pf[0] + f[0]) / 2 < -6 ? AISLE_L : AISLE_R
+        pts.push([side, pf[1]], [side, f[1]])
+      }
+    }
+    stopIdx.push(pts.length)
+    pts.push(f)
+  })
+  // distances of each stop along the route
+  const dist = [0]
+  for (let i = 1; i < pts.length; i++) dist.push(dist[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]))
+  return { path: pts, stops: stopIdx.map((k) => dist[k]) }
+}
+
+function OperatorWalker({ assignment, index }) {
+  const { op, machines } = assignment
+  const route = useMemo(() => (machines.length > 1 ? operatorRoute(machines) : null), [machines])
+  const single = machines.length === 1 ? front(machines[0]) : null
+  const idle = machines.length === 0
+  const p = route ? [route.path[0][0], 0, route.path[0][1]] : single ? [single[0], 0, single[1]] : [AISLE_L, 0, LOOM_ROWS[0] + 3 + index * 1.2]
+  return (
+    <Interactive type="worker" id={op.id} label={`${op.name} (${op.id})`} sub={`Loom operator · ${machines.length} looms`}>
+      <Worker
+        appearance={index % 5}
+        activity={route ? 'tend' : idle ? 'lookAround' : 'operate'}
+        position={p}
+        rotation={Math.PI}
+        path={route?.path}
+        stops={route?.stops}
+        speed={0.9}
+        seed={index + 3}
+        scale={0.96 + ((index * 37) % 9) / 100}
+      />
+    </Interactive>
+  )
+}
+
 export default function WorkersLayer() {
   const workers = useFactoryStore((s) => s.workers)
   const machines = useFactoryStore((s) => s.machines)
@@ -35,9 +91,13 @@ export default function WorkersLayer() {
     [statusKey],
   )
   const placed = useMemo(() => workers.map((w, i) => ({ w, i, post: postFor(w, machinesById) })), [workers, machinesById])
+  const assignments = useFactoryStore((s) => s.staffing?.assignments) || []
 
   return (
     <group>
+      {assignments.map((a, i) => (
+        <OperatorWalker key={a.op.id + ':' + a.machines.join(',')} assignment={a} index={i} />
+      ))}
       {placed.map(({ w, i, post }) => (
         <Interactive key={w.id} type="worker" id={w.id} label={`${w.name} (${w.id})`} sub={w.role}>
           <Worker

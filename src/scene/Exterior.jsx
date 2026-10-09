@@ -3,6 +3,7 @@ import { useMemo } from 'react'
 import * as THREE from 'three'
 import { ENTRANCE } from '../data/layout'
 import { Interactive } from '../components/Interactive'
+import { useFactoryStore } from '../hooks/useFactoryStore'
 import { Box, Label, TexPlane, Cyl, FloorRect } from '../components/primitives'
 import { Tree, Plant } from '../components/Props'
 import { MAT, colorMaterial } from './materials'
@@ -30,7 +31,8 @@ function Ground() {
 }
 
 function EntranceFacade() {
-  const signTex = useMemo(() => companySignTexture(), [])
+  const general = useFactoryStore((st) => st.settings?.general)
+  const signTex = useMemo(() => companySignTexture(general?.factoryName, general?.tagline), [general?.factoryName, general?.tagline])
   const canopy = useMemo(() => colorMaterial('#2b3645', { metalness: 0.4, roughness: 0.4 }), [])
   const [o0, o1] = ENTRANCE.opening
   const cx = (o0 + o1) / 2
@@ -78,7 +80,7 @@ export default function Exterior() {
   return (
     <group>
       <Ground />
-      <Interactive type="entrance" id="entrance" label="Shree Satiji Textiles" sub="Company information" view="entrance">
+      <Interactive type="entrance" id="entrance" label="Factory information" sub="Company information" view="entrance">
         <EntranceFacade />
       </Interactive>
       {[

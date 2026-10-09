@@ -93,6 +93,7 @@ const selectMachine = (id) => {
 // ---- panels ------------------------------------------------------------------------
 function MachinePanel({ id }) {
   const m = useFactoryStore((s) => s.machines.find((x) => x.id === id))
+  const op = useFactoryStore((s) => s.staffing?.machineOperator[id])
   if (!m) return null
   const st = STATUS_STYLES[m.status]
   return (
@@ -116,9 +117,15 @@ function MachinePanel({ id }) {
           </div>
           <div className="text-[11px] text-slate-400">
             Operator{' '}
-            <button className="font-semibold text-amber-300 hover:underline" onClick={() => selectWorker(m.operatorId)}>
-              {m.operator} ({m.operatorId})
-            </button>
+            {op ? (
+              <button className="font-semibold text-amber-300 hover:underline" onClick={() => selectWorker(op.id)}>
+                {op.name} ({op.id})
+              </button>
+            ) : (
+              <button className="font-semibold text-rose-300 hover:underline" onClick={() => useFactoryStore.getState().setSettingsOpen(true, 'staffing')}>
+                none assigned — fix in Settings
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -157,7 +164,7 @@ function MachinePanel({ id }) {
       </Section>
       <div className="mt-4 flex gap-2">
         <ActionButton icon={Crosshair} onClick={() => focusOnKey(`machine:${m.id}`)}>Focus</ActionButton>
-        <ActionButton icon={User} onClick={() => selectWorker(m.operatorId)}>Operator</ActionButton>
+        {op && <ActionButton icon={User} onClick={() => selectWorker(op.id)}>Operator</ActionButton>}
       </div>
     </>
   )
@@ -171,7 +178,98 @@ function shiftHours(start) {
   return hhmm(Math.min(mins, 12 * 60))
 }
 
+const ATT_STYLE = {
+  present: 'bg-emerald-500/15 text-emerald-200 ring-emerald-400/30',
+  half: 'bg-sky-500/15 text-sky-200 ring-sky-400/30',
+  absent: 'bg-rose-500/15 text-rose-200 ring-rose-400/30',
+  leave: 'bg-amber-500/15 text-amber-200 ring-amber-400/30',
+}
+const ATT_NAME = { present: 'Present', half: 'Half day', absent: 'Absent', leave: 'On leave' }
+
+function OperatorPanel({ id }) {
+  const settings = useFactoryStore((s) => s.settings)
+  const staffing = useFactoryStore((s) => s.staffing)
+  const machines = useFactoryStore((s) => s.machines)
+  const op = settings?.operators.find((o) => o.id === id)
+  if (!op || !staffing) return null
+  const att = staffing.attendanceOf(op)
+  const looms = staffing.assignments.find((a) => a.op.id === id)?.machines || []
+  const shift = settings.general.shifts.find((x) => x.id === op.shift)
+  const month = staffing.date.slice(0, 7)
+  let full = 0
+  let half = 0
+  let leave = 0
+  for (const [d, day] of Object.entries(settings.attendance)) {
+    if (!d.startsWith(month)) continue
+    const st = day[id]?.status
+    if (st === 'present') full++
+    if (st === 'half') half++
+    if (st === 'leave') leave++
+  }
+  const days = full + half / 2
+  const out = machines.filter((m) => looms.includes(m.id))
+  const prod = out.reduce((a, m) => a + m.production, 0)
+  const initials = op.name.split(' ').map((p) => p[0]).join('')
+  return (
+    <>
+      <div className="flex items-center gap-3">
+        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-300 to-amber-600 text-lg font-extrabold text-slate-900">{initials}</div>
+        <div className="min-w-0">
+          <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Loom operator · {op.id}</div>
+          <div className="truncate text-xl font-extrabold text-white">{op.name}</div>
+          <div className="text-[13px] text-amber-200">{shift?.name} · {shift?.start}–{shift?.end}</div>
+        </div>
+      </div>
+      <div className={`mt-3 flex items-center justify-between rounded-xl px-3 py-2 text-[12px] font-semibold ring-1 ${ATT_STYLE[att.status]}`}>
+        <span>Today: {ATT_NAME[att.status]}</span>
+        <span>{att.in ? `In ${att.in}` : ''}{att.out ? ` · Out ${att.out}` : ''}{att.ot ? ` · OT ${att.ot} h` : ''}</span>
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <Tile icon={Cog} label="Looms tended" value={looms.length} unit={`/ ${staffing.perOperator} max`} color="text-emerald-300" />
+        <Tile icon={Layers} label="Output today" value={num(prod)} unit="m" color="text-sky-300" />
+        <Tile icon={Clock} label="Days this month" value={days} unit={leave ? `· ${leave} leave` : ''} />
+        <Tile icon={IndianRupee} label="Earned (month)" value={inrShort(days * (op.dailyWage || 0))} color="text-amber-300" />
+      </div>
+      <Section title="Assigned looms" right={<span className="text-[10px] text-slate-500">click a loom</span>}>
+        {out.length ? (
+          <div className="grid grid-cols-5 gap-1.5">
+            {out.map((m) => {
+              const st = STATUS_STYLES[m.status]
+              return (
+                <button key={m.id} onClick={() => selectMachine(m.id)} className={`rounded-lg py-1.5 text-center ring-1 transition hover:scale-105 ${st.bg} ${st.ring}`}>
+                  <div className={`text-[11px] font-bold ${st.text}`}>{m.id.replace('WJ-', '')}</div>
+                  <div className="text-[9px] text-slate-400">{m.status === 'running' ? `${m.efficiency}%` : m.status === 'idle' ? 'idle' : 'maint'}</div>
+                </button>
+              )
+            })}
+          </div>
+        ) : (
+          <div className="rounded-xl bg-white/[0.03] p-3 text-[12px] text-slate-400 ring-1 ring-white/5">{PRESENT_OK(att.status) ? 'No looms assigned.' : 'Not on the floor today.'}</div>
+        )}
+      </Section>
+      <Section title="Details">
+        <div className="rounded-xl bg-white/[0.03] px-3 py-1 ring-1 ring-white/5">
+          <Row label="Skill" value={op.skill} />
+          <Row label="Phone" value={op.phone || '—'} />
+          <Row label="Daily wage" value={inr(op.dailyWage || 0)} />
+        </div>
+      </Section>
+      <div className="mt-4 flex gap-2">
+        <ActionButton icon={Crosshair} onClick={() => focusOnKey(`worker:${op.id}`)}>Focus</ActionButton>
+        <ActionButton icon={Users} onClick={() => useFactoryStore.getState().setSettingsOpen(true, 'attendance')}>Attendance</ActionButton>
+      </div>
+    </>
+  )
+}
+const PRESENT_OK = (st) => st === 'present' || st === 'half'
+
 function WorkerPanel({ id }) {
+  const isOperator = useFactoryStore((s) => !!s.settings?.operators.some((o) => o.id === id))
+  if (isOperator) return <OperatorPanel id={id} />
+  return <StaffPanel id={id} />
+}
+
+function StaffPanel({ id }) {
   const w = useFactoryStore((s) => s.workers.find((x) => x.id === id))
   const m = useFactoryStore((s) => s.machines.find((x) => x.id === w?.station))
   if (!w) return null
@@ -532,10 +630,11 @@ function TruckPanel() {
 
 function EntrancePanel() {
   const c = useFactoryStore((s) => s.company)
+  const factoryName = useFactoryStore((s) => s.settings?.general.factoryName)
   if (!c) return null
   return (
     <>
-      <Header icon={DoorOpen} kicker="Main entrance" title={c.name} color="#fcd34d" />
+      <Header icon={DoorOpen} kicker="Main entrance" title={factoryName || c.name} color="#fcd34d" />
       <div className="mt-1 pl-14 text-[12px] font-semibold uppercase tracking-[0.25em] text-slate-400">{c.tagline}</div>
       <div className="mt-4 grid grid-cols-2 gap-2">
         <Tile label="Looms" value={c.looms} color="text-emerald-300" />

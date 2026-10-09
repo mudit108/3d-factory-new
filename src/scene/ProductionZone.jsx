@@ -86,6 +86,7 @@ function InspectionMachine({ running }) {
 export default function ProductionZone() {
   const machines = useFactoryStore((s) => s.machines)
   const showLabels = useFactoryStore((s) => s.showLabels)
+  const factoryName = useFactoryStore((s) => s.settings?.general.factoryName ?? 'SHREE SATIJI TEXTILES')
   const byId = useMemo(() => Object.fromEntries(machines.map((m) => [m.id, m])), [machines])
   const statusKey = machines.map((m) => m.status).join(',')
   // re-render looms only when a status changes (not on every live tick)
@@ -130,7 +131,7 @@ export default function ProductionZone() {
         <Box size={[14, 0.08, 0.3]} position={[0, 0.08, -0.4]} material={MAT.yellow} />
       </group>
 
-      <ZoneBanner text="WATERJET LOOMS" sub="38 LOOMS · SHREE SATIJI TEXTILES" position={[-6, 5.6, 16.5]} width={9} accent="#34d399" />
+      <ZoneBanner text="WATERJET LOOMS" sub={`${loomPlacements.length} LOOMS · ${factoryName}`} position={[-6, 5.6, 16.5]} width={9} accent="#34d399" />
     </group>
   )
 }

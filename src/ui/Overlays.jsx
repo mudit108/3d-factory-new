@@ -225,7 +225,7 @@ export function HelpModal() {
     [ZoomIn, 'Zoom', 'Mouse wheel / pinch'],
     [Hand, 'Inspect', 'Hover for a tooltip, click any machine, rack, office, worker or truck'],
   ]
-  const keys = [['1 – 6', 'Camera views'], ['P', 'Presentation mode'], ['G', 'Walkthrough mode'], ['V', 'Free fly mode'], ['O', 'Open view (roof on/off)'], ['L', 'Toggle labels'], ['F', 'Toggle flow'], ['Esc', 'Close panel / exit mode']]
+  const keys = [['1 – 6', 'Camera views'], ['P', 'Presentation mode'], ['G', 'Walkthrough mode'], ['V', 'Free fly mode'], ['O', 'Open view (roof on/off)'], ['L', 'Toggle labels'], ['F', 'Toggle flow'], ['M', 'Factory sound on/off'], [',', 'Settings'], ['Esc', 'Close panel / exit mode']]
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm" onClick={() => setOpen(false)}>
       <div className="glass fade-in w-full max-w-lg rounded-3xl p-6" onClick={(e) => e.stopPropagation()}>

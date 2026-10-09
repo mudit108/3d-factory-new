@@ -4,7 +4,7 @@ import { yarnRackPlacements, finishedRackPlacements, YARN_RACK, FG_RACK, RECEIVI
 import { useFactoryStore } from '../hooks/useFactoryStore'
 import { Interactive } from '../components/Interactive'
 import { YarnRack, FabricRack } from '../components/Racks'
-import { CartonStack, RollStack, BaleStack, PalletJack, Forklift, Pallet } from '../components/Props'
+import { CartonStack, RollStack, BaleStack, PalletJack, Pallet } from '../components/Props'
 import { Box, Label, RBox } from '../components/primitives'
 import { MAT, colorMaterial } from './materials'
 import { ZoneBanner } from './ProductionZone'
@@ -63,7 +63,6 @@ export function YarnStore() {
       <CartonStack position={[-49.8, 0, 18.6]} ny={3} seed={13} wrap />
       <WeighScale position={[-47.4, 0, 17.6]} />
       <PalletJack position={[-48.2, 0, 13.6]} rotation={-0.6} />
-      <Forklift position={[-43.6, 0, 18.2]} rotation={Math.PI} />
       <Pallet position={[-40.6, 0, 19.8]} />
       <Pallet position={[-40.6, 0.145, 19.8]} />
       <Pallet position={[-40.6, 0.29, 19.8]} />

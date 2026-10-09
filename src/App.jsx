@@ -6,6 +6,7 @@ import { useFactoryStore } from './hooks/useFactoryStore'
 import { Brand, Toolbar, StatusPanel, NavMenu, WorkflowBar, Tooltip } from './ui/Hud'
 import MiniMap from './ui/MiniMap'
 import DetailPanel from './ui/DetailPanel'
+import SettingsModal from './ui/SettingsModal'
 import { WalkthroughOverlay, PresentationOverlay, LoadingScreen, HelpModal } from './ui/Overlays'
 import { goToView } from './scene/focus'
 
@@ -94,6 +95,7 @@ export default function App() {
       {mode === 'present' && <PresentationOverlay />}
       <Tooltip />
       <HelpModal />
+      <SettingsModal />
       <LoadingScreen />
     </div>
   )

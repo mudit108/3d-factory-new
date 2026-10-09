@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { getFactorySnapshot, subscribeToLiveUpdates } from '../services/factoryApi'
+import { loadSettings } from '../services/settingsService'
 import { useFactoryStore } from './useFactoryStore'
 
 /** Loads the factory snapshot once and keeps machine data live. */
@@ -11,7 +12,11 @@ export function useFactoryData() {
   useEffect(() => {
     let unsub = () => {}
     let cancelled = false
-    getFactorySnapshot()
+    loadSettings()
+      .then((settings) => {
+        if (!cancelled) useFactoryStore.getState().applySettings(settings, { display: true })
+        return getFactorySnapshot()
+      })
       .then((snap) => {
         if (cancelled) return
         setSnapshot(snap)
